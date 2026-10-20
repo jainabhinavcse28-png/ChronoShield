@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoShield - Simple Polyglot NoSQL (MongoDB + Neo4j) Attack Detection</title>
+    <!-- Google Fonts & Vis.js Network Engine -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">🛡️</div>
+                <div class="brand-text">
+                    <h2>ChronoShield</h2>
+                    <span class="sub-text">Simple Polyglot NoSQL</span>
+                </div>
+            </div>
+
+            <!-- Database Status Box -->
+            <div class="db-status-box">
+                <div class="status-title">NoSQL Database Status</div>
+                <div class="status-item">
+                    <div class="status-label">
+                        <span class="dot" id="mongo-dot"></span>
+                        <span>MongoDB (Documents)</span>
+                    </div>
+                    <span class="badge" id="mongo-badge">In-Memory</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">
+                        <span class="dot" id="neo4j-dot"></span>
+                        <span>Neo4j (Cypher Graph)</span>
+                    </div>
+                    <span class="badge" id="neo4j-badge">In-Memory</span>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="nav-menu">
+                <a class="nav-link active" data-tab="tab-graph">
+                    <span class="nav-icon">📊</span> 1. Attack Graph & Cypher
+                </a>
+                <a class="nav-link" data-tab="tab-mongo">
+                    <span class="nav-icon">🍃</span> 2. MongoDB CRUD Studio
+                </a>
+                <a class="nav-link" data-tab="tab-neo4j">
+                    <span class="nav-icon">🕸️</span> 3. Neo4j Cypher CRUD
+                </a>
+            </nav>
+
+            <!-- Quick Action Buttons -->
+            <div class="action-box">
+                <button id="btn-load-scenario" class="btn-primary" style="margin-bottom: 8px;">
+                    <span class="btn-icon">⚡</span> Load 6-Stage Attack
+                </button>
+                <button id="btn-clear-scenario" class="btn-outline-danger">
+                    <span class="btn-icon">🧹</span> Clear All Data
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div>
+                    <h1 class="page-title">ChronoShield: Cyber Attack Detection Platform</h1>
+                    <p class="page-desc">MongoDB Document Store &bull; Neo4j Temporal Graph &bull; Cypher Path Traversal &bull; Full CRUD</p>
+                </div>
+                <div class="header-right">
+                    <div class="system-time" id="clock-display">Loading...</div>
+                </div>
+            </header>
+
+            <!-- Key Metrics Stats Cards -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">MongoDB Logs (Documents)</span>
+                        <span class="stat-icon">📄</span>
+                    </div>
+                    <div class="stat-value" id="stat-logs">0</div>
+                    <div class="stat-sub">Collection: <code>db.security_logs</code></div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Neo4j Graph Nodes</span>
+                        <span class="stat-icon">🔵</span>
+                    </div>
+                    <div class="stat-value" id="stat-nodes">0</div>
+                    <div class="stat-sub">Hosts, Users, Processes, IPs</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Neo4j Relationships</span>
+                        <span class="stat-icon">🔗</span>
+                    </div>
+                    <div class="stat-value" id="stat-edges">0</div>
+                    <div class="stat-sub">Directed Attack Edges</div>
+                </div>
+
+                <div class="stat-card alert-card">
+                    <div class="stat-header">
+                        <span class="stat-title">High Risk Alerts</span>
+                        <span class="stat-icon">🚨</span>
+                    </div>
+                    <div class="stat-value" id="stat-alerts">0</div>
+                    <div class="stat-sub">Risk Score &ge; 70.0</div>
+                </div>
+            </section>
+
+            <!-- ==================== TAB 1: ATTACK GRAPH & CYPHER ==================== -->
+            <div id="tab-graph" class="tab-content active">
+                <div class="grid-2-col">
+                    <!-- Left: Interactive Attack Graph -->
+                    <div class="panel card-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>🕸️ Interactive Attack Graph Topology (Neo4j View)</h3>
+                                <span class="hint-text">Drag nodes, scroll to zoom. Click any node to view details.</span>
+                            </div>
+                            <div class="graph-legend">
+                                <span class="legend-item"><span class="legend-color legend-host"></span> Host</span>
+                                <span class="legend-item"><span class="legend-color legend-user"></span> User</span>
+                                <span class="legend-item"><span class="legend-color legend-process"></span> Process</span>
+                                <span class="legend-item"><span class="legend-color legend-vuln"></span> Vuln</span>
+                            </div>
+                        </div>
+                        <div id="network-container"></div>
+                    </div>
+
+                    <!-- Right: Cypher Query Console & Attack Paths -->
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Node Inspector Card -->
+                        <div class="panel card-panel" id="node-inspector-panel">
+                            <div class="panel-header">
+                                <h3>🔍 Selected Node Inspector</h3>
+                                <span class="hint-text">Click any node on the left graph</span>
+                            </div>
+                            <div id="inspector-content" class="inspector-empty">
+                                Click a node on the graph to inspect its properties and risk score.
+                            </div>
+                        </div>
+
+                        <!-- Cypher Query Playground -->
+                        <div class="panel card-panel" style="flex: 1;">
+                            <div class="panel-header">
+                                <h3>💻 Interactive Cypher Query Console</h3>
+                                <span class="tag-badge">Neo4j Cypher</span>
+                            </div>
+                            <div class="quick-queries" style="margin-bottom: 10px;">
+                                <span class="hint-text" style="display: block; margin-bottom: 6px;">Pre-built Cypher Queries (Click to Run):</span>
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path')">🎯 1. Find Attack Path</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (h:Host) RETURN h')">🖥️ 2. All Hosts</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (n) WHERE n.risk_score >= 70 RETURN n')">🚨 3. High Risk (&ge;70)</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (n)-[r]->(m) RETURN n, r, m')">🕸️ 4. All Edges</button>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                                <input type="text" id="cypher-input" class="form-control" style="font-family: var(--font-code); font-size: 12px;" value="MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path">
+                                <button id="btn-run-cypher" class="btn-secondary" style="white-space: nowrap;">Execute Cypher</button>
+                            </div>
+                            <div class="code-box-output" id="cypher-results">
+                                Execute a Cypher query above to view results...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Explainable Attack Path Breakdown -->
+                <section class="panel card-panel margin-top">
+                    <div class="panel-header">
+                        <h3>🎯 Chronological Explainable Attack Paths</h3>
+                        <span class="tag-badge">Temporal Constraint: t₁ &le; t₂ &le; ... &le; tₙ</span>
+                    </div>
+                    <div id="attack-paths-list" class="scrollable-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== TAB 2: MONGODB CRUD STUDIO ==================== -->
+            <div id="tab-mongo" class="tab-content">
+                <div class="grid-2-col">
+                    <!-- Create Log Form -->
+                    <div class="panel card-panel">
+                        <div class="panel-header">
+                            <h3>➕ MongoDB CREATE: <code>db.security_logs.insertOne()</code></h3>
+                            <span class="hint-text">Inserts a semi-structured BSON security log</span>
+                        </div>
+                        <form id="form-mongo-create">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Event Type</label>
+                                    <select id="m-evt-type" class="form-control">
+                                        <option value="AUTHENTICATION">AUTHENTICATION</option>
+                                        <option value="PROCESS_SPAWN">PROCESS_SPAWN</option>
+                                        <option value="VULNERABILITY_EXPLOIT">VULNERABILITY_EXPLOIT</option>
+                                        <option value="LATERAL_MOVEMENT">LATERAL_MOVEMENT</option>
+                                        <option value="DATA_EXFILTRATION">DATA_EXFILTRATION</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Severity Level</label>
+                                    <select id="m-severity" class="form-control">
+                                        <option value="LOW">LOW</option>
+                                        <option value="MEDIUM" selected>MEDIUM</option>
+                                        <option value="HIGH">HIGH</option>
+                                        <option value="CRITICAL">CRITICAL</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Host ID</label>
+                                    <input type="text" id="m-host-id" class="form-control" value="HOST-JUMPBOX-01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>User Account</label>
+                                    <input type="text" id="m-user" class="form-control" value="admin_temp" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>IP Address</label>
+                                    <input type="text" id="m-ip" class="form-control" value="198.51.100.44" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Log Message</label>
+                                    <input type="text" id="m-desc" class="form-control" value="User authenticated via RDP from external IP" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary" style="margin-top: 10px;">
+                                Insert Log into MongoDB (db.insertOne)
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- MongoDB Command Inspector -->
+                    <div class="panel card-panel">
+                        <div class="panel-header">
+                            <h3>🔍 MongoDB Command Inspector</h3>
+                            <span class="tag-badge">Real-time Shell Code</span>
+                        </div>
+                        <p class="hint-text" style="margin-bottom: 8px;">Displays the exact MongoDB shell command executed by your last action:</p>
+                        <div class="code-box-output" id="mongo-command-display" style="height: 180px;">
+// MongoDB Command will appear here after CRUD operations
+db.security_logs.find().sort({ timestamp: -1 }).limit(10);
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Read, Update, Delete Documents Table -->
+                <section class="panel card-panel margin-top">
+                    <div class="panel-header">
+                        <div>
+                            <h3>📖 MongoDB READ, UPDATE & DELETE: <code>db.security_logs</code></h3>
+                            <span class="hint-text">View records, update investigation status, or delete false positives</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="filter-mongo-severity" class="form-control" style="width: 140px;">
+                                <option value="ALL">All Severities</option>
+                                <option value="CRITICAL">CRITICAL</option>
+                                <option value="HIGH">HIGH</option>
+                                <option value="MEDIUM">MEDIUM</option>
+                                <option value="LOW">LOW</option>
+                            </select>
+                            <button onclick="fetchMongoLogs()" class="btn-secondary" style="padding: 6px 12px;">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Event ID</th>
+                                    <th>Timestamp</th>
+                                    <th>Severity</th>
+                                    <th>Status</th>
+                                    <th>Event Type</th>
+                                    <th>Host</th>
+                                    <th>User</th>
+                                    <th>Description</th>
+                                    <th>Actions (CRUD)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mongo-logs-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== TAB 3: NEO4J CYPHER CRUD STUDIO ==================== -->
+            <div id="tab-neo4j" class="tab-content">
+                <div class="grid-2-col">
+                    <!-- Create Node Form -->
+                    <div class="panel card-panel">
+                        <div class="panel-header">
+                            <h3>➕ Neo4j CREATE NODE: <code>CREATE (n:Label {...})</code></h3>
+                            <span class="hint-text">Adds a new entity node into the graph</span>
+                        </div>
+                        <form id="form-neo4j-node">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Node ID (Unique)</label>
+                                    <input type="text" id="n-node-id" class="form-control" value="Host:HOST-BACKUP-01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Node Label</label>
+                                    <select id="n-label" class="form-control">
+                                        <option value="Host">Host</option>
+                                        <option value="User">User</option>
+                                        <option value="Process">Process</option>
+                                        <option value="IPAddress">IPAddress</option>
+                                        <option value="Vulnerability">Vulnerability</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Display Name</label>
+                                    <input type="text" id="n-name" class="form-control" value="HOST-BACKUP-01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Initial Risk Score (0-100)</label>
+                                    <input type="number" id="n-risk" class="form-control" value="25.0" min="0" max="100" step="0.5" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary" style="margin-top: 10px;">
+                                Create Node via Cypher (CREATE)
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Create Edge Form -->
+                    <div class="panel card-panel">
+                        <div class="panel-header">
+                            <h3>🔗 Neo4j CREATE RELATIONSHIP: <code>CREATE (a)-[r]->(b)</code></h3>
+                            <span class="hint-text">Connects two existing nodes with an attack edge</span>
+                        </div>
+                        <form id="form-neo4j-edge">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Source Node ID</label>
+                                    <input type="text" id="e-source" class="form-control" value="Host:HOST-JUMPBOX-01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Relationship Type</label>
+                                    <select id="e-type" class="form-control">
+                                        <option value="LATERAL_MOVE_TO">LATERAL_MOVE_TO</option>
+                                        <option value="AUTHENTICATED_TO">AUTHENTICATED_TO</option>
+                                        <option value="SPAWNED">SPAWNED</option>
+                                        <option value="HOSTS_PROCESS">HOSTS_PROCESS</option>
+                                        <option value="EXPLOITED_VULN">EXPLOITED_VULN</option>
+                                        <option value="DATA_EXFILTRATION">DATA_EXFILTRATION</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="grid-column: span 2;">
+                                    <label>Target Node ID</label>
+                                    <input type="text" id="e-target" class="form-control" value="Host:HOST-DB-PROD-01" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-secondary" style="margin-top: 10px;">
+                                Create Relationship via Cypher
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Cypher Command Inspector -->
+                <div class="panel card-panel margin-top">
+                    <div class="panel-header">
+                        <h3>🔍 Cypher Command Inspector</h3>
+                        <span class="tag-badge">Real-time Cypher Code</span>
+                    </div>
+                    <div class="code-box-output" id="cypher-command-display" style="height: 100px;">
+// Cypher Command will appear here after Node/Relationship CRUD operations
+MATCH (n) RETURN n LIMIT 10;
+                    </div>
+                </div>
+
+                <!-- Read, Update, Delete Nodes Table -->
+                <section class="panel card-panel margin-top">
+                    <div class="panel-header">
+                        <div>
+                            <h3>📖 Neo4j Graph Entities (READ, UPDATE, DELETE)</h3>
+                            <span class="hint-text">View all graph nodes, modify risk scores, or detach delete</span>
+                        </div>
+                        <button onclick="fetchNeo4jNodes()" class="btn-secondary" style="padding: 6px 12px;">Refresh Nodes</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Label</th>
+                                    <th>Risk Score (0-100)</th>
+                                    <th>Metadata</th>
+                                    <th>Actions (CRUD)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="neo4j-nodes-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
