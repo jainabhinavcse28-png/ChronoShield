@@ -656,6 +656,12 @@ body {
     transform: translateY(-1px);
 }
 
+.btn-code-chip.active {
+    background: var(--primary-blue);
+    color: #FFFFFF;
+    border-color: var(--primary-blue);
+}
+
 .code-box-output {
     background: #060913;
     border: 1px solid #1E293B;

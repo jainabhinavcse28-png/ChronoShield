@@ -11,11 +11,51 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-load-scenario").addEventListener("click", loadSimpleScenario);
     document.getElementById("btn-clear-scenario").addEventListener("click", clearAllScenarioData);
 
-    // Cypher Console Runner
-    document.getElementById("btn-run-cypher").addEventListener("click", () => {
-        const query = document.getElementById("cypher-input").value;
-        runCypherQuery(query);
-    });
+    // Cypher Console Runner & Shortcuts
+    const btnRunCypher = document.getElementById("btn-run-cypher");
+    const cypherInput = document.getElementById("cypher-input");
+    const btnClearCypher = document.getElementById("btn-clear-cypher");
+    const btnViewTable = document.getElementById("btn-view-table");
+    const btnViewJson = document.getElementById("btn-view-json");
+
+    if (btnRunCypher && cypherInput) {
+        btnRunCypher.addEventListener("click", () => {
+            runCypherQuery(cypherInput.value);
+        });
+
+        // Shortcut: Ctrl+Enter or Cmd+Enter to execute query
+        cypherInput.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                runCypherQuery(cypherInput.value);
+            }
+        });
+    }
+
+    if (btnClearCypher && cypherInput) {
+        btnClearCypher.addEventListener("click", () => {
+            cypherInput.value = "";
+            cypherInput.focus();
+            const metaInfo = document.getElementById("cypher-meta-info");
+            if (metaInfo) metaInfo.innerText = "Editor cleared";
+        });
+    }
+
+    if (btnViewTable && btnViewJson) {
+        btnViewTable.addEventListener("click", () => {
+            btnViewTable.classList.add("active");
+            btnViewJson.classList.remove("active");
+            document.getElementById("cypher-table-container").style.display = "block";
+            document.getElementById("cypher-results").style.display = "none";
+        });
+
+        btnViewJson.addEventListener("click", () => {
+            btnViewJson.classList.add("active");
+            btnViewTable.classList.remove("active");
+            document.getElementById("cypher-table-container").style.display = "none";
+            document.getElementById("cypher-results").style.display = "block";
+        });
+    }
 
     // Form Submissions
     document.getElementById("form-mongo-create").addEventListener("submit", handleMongoCreate);
@@ -270,34 +310,167 @@ async function fetchAttackPaths() {
 // ==============================================================================
 
 function setAndRunCypher(query) {
-    document.getElementById("cypher-input").value = query;
+    const input = document.getElementById("cypher-input");
+    if (input) input.value = query;
     runCypherQuery(query);
 }
 
 async function runCypherQuery(query) {
+    const cleanQuery = (query || "").trim();
+    if (!cleanQuery) {
+        showToast("Please enter a Cypher query to execute.", true);
+        return;
+    }
+
     const resultsBox = document.getElementById("cypher-results");
-    resultsBox.innerText = `Executing Cypher: ${query} ...`;
+    const tableContainer = document.getElementById("cypher-table-container");
+    const metaInfo = document.getElementById("cypher-meta-info");
+
+    if (metaInfo) metaInfo.innerText = "Executing query...";
+    if (resultsBox) resultsBox.innerText = `// Executing Cypher query:\n${cleanQuery}\n\nPlease wait...`;
+    if (tableContainer) {
+        tableContainer.innerHTML = `<div class="hint-text" style="padding: 16px; text-align: center;">⚡ Executing Cypher query against graph engine...</div>`;
+    }
+
+    const startTime = performance.now();
 
     try {
         const res = await fetch("/api/neo4j/cypher", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: query })
+            body: JSON.stringify({ query: cleanQuery })
         });
         const data = await res.json();
+        const clientDurationMs = Math.round(performance.now() - startTime);
 
         if (data.result && data.result.success) {
-            const records = data.result.records;
-            resultsBox.innerText = `// Cypher Result (${data.result.mode}) - ${data.result.count} records returned\n` +
-                                   JSON.stringify(records, null, 2);
-            showToast(`Cypher executed: ${data.result.count} records found.`);
+            const records = data.result.records || [];
+            const count = data.result.count ?? records.length;
+            const execTime = data.result.execution_time_ms !== undefined ? data.result.execution_time_ms : clientDurationMs;
+            const mode = data.result.mode || "Graph Engine";
+            const message = data.result.message || "";
+
+            // Update meta pill
+            if (metaInfo) {
+                metaInfo.innerHTML = `⚡ <strong>${execTime}ms</strong> &nbsp;|&nbsp; <strong>${count}</strong> record(s) &nbsp;|&nbsp; <span style="color: var(--text-muted);">${mode}</span>`;
+            }
+
+            // Populate JSON View
+            if (resultsBox) {
+                const jsonHeader = `// Mode: ${mode} | Execution Time: ${execTime}ms | Records: ${count}\n` +
+                                   (message ? `// Note: ${message}\n` : "");
+                resultsBox.innerText = jsonHeader + JSON.stringify(records, null, 2);
+            }
+
+            // Populate Table View
+            renderCypherTable(records, tableContainer, message);
+            showToast(`Cypher executed: ${count} record(s) in ${execTime}ms`);
+
+            // If query is a mutation (CREATE, SET, DELETE, MERGE), refresh all other dashboard components!
+            const upper = cleanQuery.toUpperCase();
+            if (upper.includes("CREATE") || upper.includes("SET") || upper.includes("DELETE") || upper.includes("MERGE")) {
+                fetchStats();
+                fetchGraphTopology();
+                fetchAttackPaths();
+                fetchNeo4jNodes();
+            }
         } else {
-            resultsBox.innerText = `// Error executing Cypher:\n` + (data.result?.error || data.error || "Unknown error");
-            showToast("Cypher query error", true);
+            const errMsg = data.result?.error || data.error || "Query execution failed";
+            if (metaInfo) metaInfo.innerHTML = `<span style="color: var(--severity-critical);">Error</span>`;
+            if (resultsBox) resultsBox.innerText = `// Cypher Error:\n${errMsg}`;
+            if (tableContainer) {
+                tableContainer.innerHTML = `
+                    <div style="padding: 16px; color: var(--severity-critical); font-family: var(--font-code); font-size: 11px;">
+                        ⚠️ <strong>Query Execution Error:</strong><br>${errMsg}
+                    </div>`;
+            }
+            showToast("Cypher execution failed", true);
         }
     } catch (err) {
-        resultsBox.innerText = `// Request Failed: ${err.message}`;
+        if (metaInfo) metaInfo.innerText = "Network Error";
+        if (resultsBox) resultsBox.innerText = `// Network/Server Error:\n${err.message}`;
+        if (tableContainer) {
+            tableContainer.innerHTML = `<div class="hint-text" style="padding: 16px; color: var(--severity-critical);">Server connection failed: ${err.message}</div>`;
+        }
     }
+}
+
+function renderCypherTable(records, container, message) {
+    if (!container) return;
+
+    if (!records || records.length === 0) {
+        container.innerHTML = `
+            <div style="padding: 18px; text-align: center;">
+                <div style="font-size: 13px; color: #10B981; font-weight: 600; margin-bottom: 4px;">
+                    ✅ ${message || "Query executed successfully."}
+                </div>
+                <div class="hint-text">0 records returned matching the pattern.</div>
+            </div>`;
+        return;
+    }
+
+    // Determine columns by inspecting returned records
+    const sample = records[0];
+    let columns = [];
+
+    if (typeof sample === "object" && sample !== null) {
+        const keysSet = new Set();
+        records.slice(0, 20).forEach(r => {
+            if (typeof r === "object" && r !== null) {
+                Object.keys(r).forEach(k => keysSet.add(k));
+            }
+        });
+        columns = Array.from(keysSet);
+    } else {
+        columns = ["Result Value"];
+    }
+
+    let thHtml = columns.map(col => `<th>${col.toUpperCase()}</th>`).join("");
+    let rowsHtml = records.map((rec) => {
+        let tdHtml = "";
+        if (typeof rec === "object" && rec !== null) {
+            tdHtml = columns.map(col => {
+                const val = rec[col];
+                let displayVal = "";
+                if (val === undefined || val === null) {
+                    displayVal = `<span class="hint-text">null</span>`;
+                } else if (typeof val === "object") {
+                    if (val.id && val.label) {
+                        const pillClass = val.risk_score >= 70 ? 'pill-CRITICAL' : (val.risk_score >= 40 ? 'pill-HIGH' : 'pill-LOW');
+                        displayVal = `<div><strong>${val.id}</strong> <span class="tag-badge" style="font-size: 9px; padding: 2px 4px;">:${val.label}</span></div>` +
+                                     (val.risk_score !== undefined ? `<span class="pill ${pillClass}" style="font-size: 9px; padding: 1px 4px; margin-top: 2px; display: inline-block;">Risk: ${val.risk_score}</span>` : "");
+                    } else if (val.relationship && val.source && val.target) {
+                        displayVal = `<code>(${val.source}) -[:${val.relationship}]-> (${val.target})</code>`;
+                    } else {
+                        displayVal = `<code style="font-size: 10px;">${JSON.stringify(val)}</code>`;
+                    }
+                } else if (col.toLowerCase().includes("risk")) {
+                    const score = parseFloat(val);
+                    const pillClass = score >= 70 ? 'pill-CRITICAL' : (score >= 40 ? 'pill-HIGH' : 'pill-LOW');
+                    displayVal = `<span class="pill ${pillClass}">${score.toFixed ? score.toFixed(1) : score}</span>`;
+                } else if (typeof val === "number") {
+                    displayVal = `<span style="font-family: var(--font-code); color: #38BDF8;">${val}</span>`;
+                } else {
+                    displayVal = String(val);
+                }
+                return `<td>${displayVal}</td>`;
+            }).join("");
+        } else {
+            tdHtml = `<td>${rec}</td>`;
+        }
+        return `<tr>${tdHtml}</tr>`;
+    }).join("");
+
+    container.innerHTML = `
+        <table class="data-table" style="margin-bottom: 0;">
+            <thead>
+                <tr>${thHtml}</tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+    `;
 }
 
 // ==============================================================================

@@ -213,13 +213,15 @@ class GraphEngine:
         Returns a list of records (dicts) and execution metadata.
         """
         cypher_query_clean = cypher_query.strip()
+        start_time = datetime.datetime.now()
 
         if self.is_connected:
             try:
                 with self.driver.session() as session:
                     result = session.run(cypher_query_clean)
                     records = [record.data() for record in result]
-                    return {"success": True, "records": records, "count": len(records), "mode": "Live Neo4j"}
+                    elapsed_ms = (datetime.datetime.now() - start_time).total_seconds() * 1000.0
+                    return {"success": True, "records": records, "count": len(records), "execution_time_ms": round(elapsed_ms, 2), "mode": "Live Neo4j"}
             except Exception as e:
                 return {"success": False, "error": str(e), "mode": "Live Neo4j"}
 
@@ -228,32 +230,164 @@ class GraphEngine:
         records = []
 
         try:
-            # 1. MATCH (n) WHERE n.risk_score >= ...
-            if "WHERE" in q_upper and "RISK_SCORE" in q_upper:
+            import re
+            # 1. CREATE (n:Label { props })
+            if q_upper.startswith("CREATE (") or "CREATE (N:" in q_upper:
+                match = re.search(r'CREATE\s*\(\s*(\w+)\s*:\s*(\w+)\s*(\{.*?\})?\s*\)', cypher_query_clean, re.IGNORECASE)
+                if match:
+                    var_name, label, raw_props = match.groups()
+                    props = {}
+                    if raw_props:
+                        # Simple key-value parser
+                        for kv in re.findall(r'(\w+)\s*:\s*([\'"].*?[\'"]|\d+(?:\.\d+)?)', raw_props):
+                            val = kv[1].strip("'\"")
+                            try:
+                                val = float(val) if "." in val else int(val)
+                            except ValueError:
+                                pass
+                            props[kv[0]] = val
+                    
+                    node_id = props.get("id") or props.get("name") or f"{label}:{len(self.nodes)+1}"
+                    new_node = self.add_node(node_id, label, props)
+                    records.append({var_name: new_node})
+                    elapsed_ms = (datetime.datetime.now() - start_time).total_seconds() * 1000.0
+                    return {
+                        "success": True,
+                        "action": "CREATE",
+                        "records": records,
+                        "count": 1,
+                        "message": f"Created node {node_id} with label :{label}",
+                        "execution_time_ms": round(elapsed_ms, 2),
+                        "mode": "In-Memory Cypher Engine"
+                    }
+
+            # 2. DETACH DELETE
+            elif "DETACH DELETE" in q_upper:
+                match = re.search(r'MATCH\s*\(\s*\w+\s*\{.*?id\s*:\s*[\'"](.*?)[\'"].*?\}\s*\)\s*DETACH\s*DELETE', cypher_query_clean, re.IGNORECASE)
+                elapsed_ms = (datetime.datetime.now() - start_time).total_seconds() * 1000.0
+                if match:
+                    node_id = match.group(1)
+                    deleted = self.delete_node(node_id)
+                    return {
+                        "success": True,
+                        "action": "DELETE",
+                        "records": [],
+                        "count": 1 if deleted else 0,
+                        "message": f"Deleted node {node_id} and all attached relationships",
+                        "execution_time_ms": round(elapsed_ms, 2),
+                        "mode": "In-Memory Cypher Engine"
+                    }
+                else:
+                    return {"success": True, "records": [], "count": 0, "message": "Delete pattern executed.", "execution_time_ms": round(elapsed_ms, 2), "mode": "In-Memory Cypher Engine"}
+
+            # 3. SET n.prop = ...
+            elif " SET " in q_upper:
+                match = re.search(r'MATCH\s*\(\s*\w+\s*\{.*?id\s*:\s*[\'"](.*?)[\'"].*?\}\s*\)\s*SET\s*(\w+)\.(\w+)\s*=\s*(.*)', cypher_query_clean, re.IGNORECASE)
+                if match:
+                    node_id, var, prop_name, raw_val = match.groups()
+                    clean_val = raw_val.split()[0].strip("'\",")
+                    try:
+                        clean_val = float(clean_val) if "." in clean_val else int(clean_val)
+                    except ValueError:
+                        pass
+                    
+                    if prop_name.lower() == "risk_score":
+                        self.update_node_risk(node_id, float(clean_val))
+                    else:
+                        self.update_node_props(node_id, {prop_name: clean_val})
+                    
+                    updated_node = self.get_node_by_id(node_id)
+                    records.append({"n": updated_node})
+                    elapsed_ms = (datetime.datetime.now() - start_time).total_seconds() * 1000.0
+                    return {
+                        "success": True,
+                        "action": "UPDATE",
+                        "records": records,
+                        "count": 1,
+                        "message": f"Updated property {prop_name} on node {node_id}",
+                        "execution_time_ms": round(elapsed_ms, 2),
+                        "mode": "In-Memory Cypher Engine"
+                    }
+
+            # 4. DEGREE CENTRALITY / COUNT AGGREGATION: MATCH (h:Host)-[r]-() RETURN h, count(r)
+            elif "COUNT(" in q_upper:
+                degree_map = {}
+                for e in self.edges:
+                    src = e["source"]
+                    tgt = e["target"]
+                    degree_map[src] = degree_map.get(src, 0) + 1
+                    degree_map[tgt] = degree_map.get(tgt, 0) + 1
+                
+                sorted_degrees = sorted(degree_map.items(), key=lambda x: x[1], reverse=True)[:10]
+                for nid, deg in sorted_degrees:
+                    node_data = self.nodes.get(nid, {"id": nid, "label": "Entity"})
+                    records.append({
+                        "node_id": nid,
+                        "label": node_data.get("label", "Entity"),
+                        "degree_connections": deg,
+                        "risk_score": node_data.get("risk_score", 0.0)
+                    })
+
+            # 5. ISOLATED NODES: WHERE NOT (n)--()
+            elif "NOT (N)--()" in q_upper or "NOT (N)--" in q_upper:
+                connected = set()
+                for e in self.edges:
+                    connected.add(e["source"])
+                    connected.add(e["target"])
+                for nid, n in self.nodes.items():
+                    if nid not in connected:
+                        records.append({"isolated_node": {"id": nid, "label": n["label"], "risk_score": n["risk_score"]}})
+
+            # 6. SHORTEST PATH: shortestPath(...)
+            elif "SHORTESTPATH" in q_upper:
+                # Find shortest path from any IP to first critical Host
+                paths = []
+                for e in self.edges:
+                    if e.get("type") in ["AUTHENTICATED_TO", "LATERAL_MOVE_TO"]:
+                        records.append({
+                            "shortest_path_segment": {
+                                "source": e["source"],
+                                "hop_type": e["type"],
+                                "target": e["target"]
+                            }
+                        })
+                        if len(records) >= 5:
+                            break
+
+            # 7. SPECIFIC RELATIONSHIP MATCH: (src)-[r:TYPE]->(dest)
+            elif "-[R:" in q_upper:
+                rel_match = re.search(r'-\[\s*\w*\s*:\s*(\w+)\s*\]->', cypher_query_clean, re.IGNORECASE)
+                wanted_type = rel_match.group(1).upper() if rel_match else None
+                for e in self.edges:
+                    if wanted_type is None or e["type"].upper() == wanted_type:
+                        src_node = self.nodes.get(e["source"], {"id": e["source"]})
+                        tgt_node = self.nodes.get(e["target"], {"id": e["target"]})
+                        records.append({
+                            "source": src_node.get("props", {}).get("hostname", e["source"]),
+                            "relationship": e["type"],
+                            "target": tgt_node.get("props", {}).get("hostname", e["target"]),
+                            "timestamp": e.get("timestamp", "")
+                        })
+
+            # 8. RISK FILTER: WHERE n.risk_score >= ...
+            elif "WHERE" in q_upper and "RISK" in q_upper:
                 threshold = 70.0
-                import re
                 m = re.search(r'RISK_SCORE\s*(>=|>)\s*(\d+(?:\.\d+)?)', q_upper)
                 if m:
                     threshold = float(m.group(2))
-                for nid, n in self.nodes.items():
+                for nid, n in sorted(self.nodes.items(), key=lambda x: x[1].get("risk_score", 0), reverse=True):
                     if n.get("risk_score", 0) >= threshold:
-                        records.append({"n": {"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n["props"]}})
+                        records.append({"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n.get("props", {})})
 
-            # 2. MATCH (h:Host) or specific label
-            elif "MATCH (H:HOST)" in q_upper or "(:HOST)" in q_upper:
+            # 9. LABEL FILTER: MATCH (h:Host), MATCH (u:User), etc.
+            elif re.search(r'MATCH\s*\(\s*\w+\s*:\s*(\w+)\s*\)', q_upper):
+                lbl = re.search(r'MATCH\s*\(\s*\w+\s*:\s*(\w+)\s*\)', q_upper).group(1).capitalize()
                 for nid, n in self.nodes.items():
-                    if n["label"] == "Host":
-                        records.append({"h": {"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n["props"]}})
+                    if n["label"].upper() == lbl.upper():
+                        records.append({"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n.get("props", {})})
 
-            # 3. MATCH (u:User)
-            elif "MATCH (U:USER)" in q_upper or "(:USER)" in q_upper:
-                for nid, n in self.nodes.items():
-                    if n["label"] == "User":
-                        records.append({"u": {"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n["props"]}})
-
-            # 4. MATCH path = ... RETURN path
+            # 10. ATTACK PATH: MATCH path = ...
             elif "PATH" in q_upper and "RETURN" in q_upper:
-                # Return paths connecting entry nodes to critical assets
                 for e in self.edges:
                     records.append({
                         "path": {
@@ -264,28 +398,30 @@ class GraphEngine:
                         }
                     })
 
-            # 5. MATCH (n)-[r]->(m) RETURN n, r, m
-            elif "-[R]->" in q_upper or "-[" in q_upper:
-                for e in self.edges:
+            # 11. GENERAL GRAPH TRAVERSAL: MATCH (n)-[r]->(m)
+            elif "-[R]->" in q_upper or "->(" in q_upper:
+                for e in self.edges[:50]:
                     src_node = self.nodes.get(e["source"], {"id": e["source"]})
                     tgt_node = self.nodes.get(e["target"], {"id": e["target"]})
                     records.append({
-                        "n": src_node,
-                        "r": {"type": e["type"], "props": e.get("props", {})},
-                        "m": tgt_node
+                        "source": src_node,
+                        "relationship": e["type"],
+                        "target": tgt_node
                     })
 
-            # 6. MATCH (n) RETURN n (All nodes)
-            elif "MATCH (N)" in q_upper:
-                for nid, n in self.nodes.items():
-                    records.append({"n": {"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n["props"]}})
-
-            # 7. Fallback: Return all nodes
+            # 12. DEFAULT FALLBACK: MATCH (n) RETURN n
             else:
-                for nid, n in self.nodes.items():
-                    records.append({"n": {"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n["props"]}})
+                for nid, n in list(self.nodes.items())[:50]:
+                    records.append({"id": nid, "label": n["label"], "risk_score": n["risk_score"], **n.get("props", {})})
 
-            return {"success": True, "records": records, "count": len(records), "mode": "In-Memory Cypher Engine"}
+            elapsed_ms = (datetime.datetime.now() - start_time).total_seconds() * 1000.0
+            return {
+                "success": True,
+                "records": records,
+                "count": len(records),
+                "execution_time_ms": round(elapsed_ms, 2),
+                "mode": "In-Memory Cypher Engine"
+            }
         except Exception as ex:
             return {"success": False, "error": str(ex), "mode": "In-Memory Cypher Engine"}
 

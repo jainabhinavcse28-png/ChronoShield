@@ -158,7 +158,7 @@
                                 <span class="tag-badge">Neo4j Cypher</span>
                             </div>
                             <div class="quick-queries" style="margin-bottom: 10px;">
-                                <span class="hint-text" style="display: block; margin-bottom: 6px;">10 Meaningful Cypher Queries (Click to Run):</span>
+                                <span class="hint-text" style="display: block; margin-bottom: 6px;">10 Meaningful Cypher Queries (Click to Load &amp; Run):</span>
                                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                     <button class="btn-code-chip" onclick="setAndRunCypher('MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path')">🎯 1. Attack Path</button>
                                     <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (src:Host)-[r:LATERAL_MOVE_TO]->(dest:Host) RETURN src, r, dest')">🔀 2. Lateral Movement</button>
@@ -172,13 +172,36 @@
                                     <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (n) WHERE NOT (n)--() RETURN n')">🔍 10. Isolated Assets</button>
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                                <input type="text" id="cypher-input" class="form-control" style="font-family: var(--font-code); font-size: 12px;" value="MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path">
-                                <button id="btn-run-cypher" class="btn-secondary" style="white-space: nowrap;">Execute Cypher</button>
+
+                            <!-- Custom Cypher Editor -->
+                            <div style="margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                    <label style="font-size: 11px; font-weight: 600; color: var(--text-muted);">Custom Cypher Query Editor (Multi-Line Supported):</label>
+                                    <span class="hint-text" style="font-size: 10px;">Supports MATCH, CREATE, SET, DETACH DELETE, shortestPath</span>
+                                </div>
+                                <textarea id="cypher-input" rows="3" class="form-control" style="width: 100%; font-family: var(--font-code); font-size: 12px; line-height: 1.5; resize: vertical;" placeholder="// Write any custom Cypher query here, for example:&#10;MATCH (n) RETURN n LIMIT 25">MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path</textarea>
                             </div>
-                            <div class="code-box-output" id="cypher-results">
-                                Execute a Cypher query above to view results...
+
+                            <!-- Action Bar & View Toggles -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; gap: 8px;">
+                                    <button id="btn-run-cypher" class="btn-primary" style="padding: 6px 14px; font-weight: 600; font-size: 12px; cursor: pointer;">▶️ Execute Cypher</button>
+                                    <button id="btn-clear-cypher" class="btn-secondary" style="padding: 6px 12px; font-size: 12px; cursor: pointer;">🧹 Clear Editor</button>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="cypher-meta-info" class="hint-text" style="font-family: var(--font-code); font-size: 11px; color: var(--accent-teal);">Ready</span>
+                                    <div style="display: flex; gap: 4px;">
+                                        <button id="btn-view-table" class="btn-code-chip active" type="button" style="font-size: 10px; padding: 3px 8px;">📊 Table View</button>
+                                        <button id="btn-view-json" class="btn-code-chip" type="button" style="font-size: 10px; padding: 3px 8px;">{ } JSON View</button>
+                                    </div>
+                                </div>
                             </div>
+
+                            <!-- Dual-View Output Container -->
+                            <div id="cypher-table-container" class="table-responsive" style="max-height: 240px; border: 1px solid var(--border-color); border-radius: 6px; background: #0B1120;">
+                                <div class="hint-text" style="padding: 16px; text-align: center;">Write your custom Cypher query or choose a preset above and click "Execute Cypher" to see results.</div>
+                            </div>
+                            <pre id="cypher-results" class="code-box-output" style="display: none; max-height: 240px; overflow-y: auto; margin-top: 0;">// Cypher output will appear here...</pre>
                         </div>
                     </div>
                 </div>
