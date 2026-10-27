@@ -158,12 +158,18 @@
                                 <span class="tag-badge">Neo4j Cypher</span>
                             </div>
                             <div class="quick-queries" style="margin-bottom: 10px;">
-                                <span class="hint-text" style="display: block; margin-bottom: 6px;">Pre-built Cypher Queries (Click to Run):</span>
+                                <span class="hint-text" style="display: block; margin-bottom: 6px;">10 Meaningful Cypher Queries (Click to Run):</span>
                                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path')">🎯 1. Find Attack Path</button>
-                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (h:Host) RETURN h')">🖥️ 2. All Hosts</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH path = (a:IPAddress)-[*1..4]->(target:Host) RETURN path')">🎯 1. Attack Path</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (src:Host)-[r:LATERAL_MOVE_TO]->(dest:Host) RETURN src, r, dest')">🔀 2. Lateral Movement</button>
                                     <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (n) WHERE n.risk_score >= 70 RETURN n')">🚨 3. High Risk (&ge;70)</button>
-                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (n)-[r]->(m) RETURN n, r, m')">🕸️ 4. All Edges</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (h:Host)-[:MALICIOUS_PROCESS]->(p:Process) RETURN h, p')">⚡ 4. Malicious Process</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (h:Host)-[r:EXPLOITED_VULN]->(v:Vulnerability) WHERE v.cvss >= 8.5 RETURN h, v')">💥 5. Critical CVEs</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (ip:IPAddress)-[:AUTHENTICATED_FROM]->(u:User) RETURN ip, u')">🔑 6. External Logins</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (h:Host)-[r:DATA_EXFILTRATION]->(c2:IPAddress) RETURN h, r, c2')">📡 7. Data Exfiltration</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH p = shortestPath((a:IPAddress)-[*]-(dc:Host)) RETURN p')">📍 8. Shortest Path</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (h:Host)-[r]-() RETURN h, count(r) AS degree')">🌐 9. Degree Centrality</button>
+                                    <button class="btn-code-chip" onclick="setAndRunCypher('MATCH (n) WHERE NOT (n)--() RETURN n')">🔍 10. Isolated Assets</button>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 8px; margin-bottom: 10px;">
