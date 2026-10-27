@@ -119,6 +119,56 @@ def api_clear_scenario():
     })
 
 # ==============================================================================
+# SECTION 1.5: POLYGLOT CROSS-DATABASE JOIN API
+# ==============================================================================
+
+@app.route("/api/database/join")
+def api_database_join():
+    """
+    Demonstrates a Polyglot Cross-Database JOIN:
+    Extracts high-risk nodes from Neo4j (Graph DB) and JOINs them
+    with raw BSON telemetry logs from MongoDB (Document DB) using the entity ID as the foreign key.
+    """
+    target_id = request.args.get("entity_id", "HOST-JUMPBOX-01")
+    
+    node_key = f"Host:{target_id}" if not target_id.startswith("Host:") else target_id
+    clean_host_id = target_id.replace("Host:", "")
+    
+    # 1. Fetch from Neo4j Graph DB
+    graph_node = graph_eng.get_node_by_id(node_key)
+    connected_edges = [e for e in graph_eng.edges if e["source"] == node_key or e["target"] == node_key]
+    
+    # 2. JOIN with MongoDB Document Store on host_id
+    all_logs = mongo_mgr.get_all_telemetry(limit=200)
+    matched_logs = []
+    for log in all_logs:
+        log_host = log.get("host", {})
+        h_id = log_host.get("host_id") if isinstance(log_host, dict) else log_host
+        src_host = log.get("source_host", {})
+        s_id = src_host.get("host_id") if isinstance(src_host, dict) else src_host
+        tgt_host = log.get("target_host", {})
+        t_id = tgt_host.get("host_id") if isinstance(tgt_host, dict) else tgt_host
+        
+        if clean_host_id in [h_id, s_id, t_id]:
+            matched_logs.append(log)
+            
+    return jsonify({
+        "status": "success",
+        "join_type": "Cross-Database Polyglot JOIN (Neo4j Graph Node ⋈ MongoDB Documents)",
+        "join_key": f"host_id = '{clean_host_id}'",
+        "neo4j_graph_entity": {
+            "node_id": node_key,
+            "label": graph_node.get("label") if graph_node else "Host",
+            "risk_score": graph_node.get("risk_score") if graph_node else 0.0,
+            "properties": graph_node.get("props") if graph_node else {},
+            "connected_relationships_count": len(connected_edges),
+            "relationships": connected_edges
+        },
+        "mongodb_matched_documents_count": len(matched_logs),
+        "mongodb_documents": matched_logs
+    })
+
+# ==============================================================================
 # SECTION 2: MONGODB CRUD OPERATIONS (DOCUMENT NOSQL)
 # ==============================================================================
 

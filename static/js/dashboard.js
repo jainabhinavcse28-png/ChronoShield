@@ -17,6 +17,12 @@ document.addEventListener("DOMContentLoaded", () => {
         runCypherQuery(query);
     });
 
+    // Cross-Database JOIN Runner
+    const btnJoin = document.getElementById("btn-execute-join");
+    if (btnJoin) {
+        btnJoin.addEventListener("click", executeDatabaseJoin);
+    }
+
     // Form Submissions
     document.getElementById("form-mongo-create").addEventListener("submit", handleMongoCreate);
     document.getElementById("form-neo4j-node").addEventListener("submit", handleNeo4jCreateNode);
@@ -72,6 +78,8 @@ function initTabs() {
                 fetchMongoLogs();
             } else if (tabId === "tab-neo4j") {
                 fetchNeo4jNodes();
+            } else if (tabId === "tab-join") {
+                executeDatabaseJoin();
             }
         });
     });
@@ -581,6 +589,45 @@ async function deleteNeo4jNode(nodeId) {
         }
     } catch (err) {
         showToast("Error deleting node in Neo4j", true);
+    }
+}
+
+// ==============================================================================
+// 6. CROSS-DATABASE POLYGLOT JOIN
+// ==============================================================================
+
+async function executeDatabaseJoin() {
+    const select = document.getElementById("join-entity-select");
+    const entityId = select ? select.value : "HOST-JUMPBOX-01";
+    const neoOut = document.getElementById("join-neo4j-output");
+    const mongoOut = document.getElementById("join-mongo-output");
+
+    if (!neoOut || !mongoOut) return;
+
+    neoOut.innerText = `Querying Neo4j Graph Database for entity: ${entityId}...`;
+    mongoOut.innerText = `Executing Polyglot JOIN with MongoDB security logs...`;
+
+    try {
+        const res = await fetch(`/api/database/join?entity_id=${encodeURIComponent(entityId)}`);
+        const data = await res.json();
+
+        neoOut.innerText = `// Neo4j Entity Details (${data.neo4j_graph_entity.node_id})\n` +
+                           `Risk Score: ${data.neo4j_graph_entity.risk_score}\n` +
+                           `Label: ${data.neo4j_graph_entity.label}\n` +
+                           `Connected Edges: ${data.neo4j_graph_entity.connected_relationships_count}\n` +
+                           `Properties:\n` +
+                           JSON.stringify(data.neo4j_graph_entity.properties, null, 2) + "\n\n" +
+                           `Relationships:\n` +
+                           JSON.stringify(data.neo4j_graph_entity.relationships, null, 2);
+
+        mongoOut.innerText = `// MongoDB Matched Documents (${data.mongodb_matched_documents_count} logs joined on ${data.join_key})\n` +
+                             JSON.stringify(data.mongodb_documents, null, 2);
+
+        showToast(`Polyglot JOIN completed: ${data.mongodb_matched_documents_count} logs joined.`);
+    } catch (err) {
+        neoOut.innerText = "Error executing join: " + err.message;
+        mongoOut.innerText = "Error executing join: " + err.message;
+        showToast("Error executing database join", true);
     }
 }
 
