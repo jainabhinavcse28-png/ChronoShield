@@ -53,9 +53,6 @@
                 <a class="nav-link" data-tab="tab-neo4j">
                     <span class="nav-icon">🕸️</span> 3. Neo4j Cypher CRUD
                 </a>
-                <a class="nav-link" data-tab="tab-join">
-                    <span class="nav-icon">🔗</span> 4. Cross-Database JOIN
-                </a>
             </nav>
 
             <!-- Quick Action Buttons -->
@@ -413,87 +410,6 @@ MATCH (n) RETURN n LIMIT 10;
                         </table>
                     </div>
                 </section>
-            </div>
-
-            <!-- ==================== TAB 4: CROSS-DATABASE JOIN ==================== -->
-            <div id="tab-join" class="tab-content">
-                <div class="panel card-panel">
-                    <div class="panel-header">
-                        <div>
-                            <h3>🔗 Cross-Database Polyglot JOIN (Neo4j Graph Node ⋈ MongoDB Documents)</h3>
-                            <span class="hint-text">Correlates graph topological entities with deep audit log payloads across NoSQL databases</span>
-                        </div>
-                        <span class="tag-badge">Polyglot JOIN</span>
-                    </div>
-
-                    <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; background: #0B1120; padding: 12px; border-radius: 8px;">
-                        <div class="form-group" style="flex: 1;">
-                            <label>Target Entity / Host ID to JOIN</label>
-                            <select id="join-entity-select" class="form-control">
-                                <option value="HOST-JUMPBOX-01">HOST-JUMPBOX-01 (Compromised Jumpbox Host)</option>
-                                <option value="HOST-DB-PROD-01">HOST-DB-PROD-01 (Critical Production Database)</option>
-                                <option value="HOST-FIN-WS-01">HOST-FIN-WS-01 (Finance Workstation)</option>
-                            </select>
-                        </div>
-                        <button id="btn-execute-join" class="btn-primary" style="height: 38px; padding: 0 20px;">
-                            🔗 Execute Cross-Database JOIN
-                        </button>
-                    </div>
-
-                    <div class="grid-2-col">
-                        <!-- Left: Neo4j Graph Entity Side -->
-                        <div class="panel" style="background: #0B1120; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
-                            <h4 style="color: #38BDF8; margin-bottom: 8px; font-size: 13px;">🕸️ Neo4j Graph Database Entity</h4>
-                            <div id="join-neo4j-output" class="code-box-output" style="height: 220px;">
-Select an entity above and click "Execute Cross-Database JOIN"...
-                            </div>
-                        </div>
-
-                        <!-- Right: MongoDB Document Side -->
-                        <div class="panel" style="background: #0B1120; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
-                            <h4 style="color: #10B981; margin-bottom: 8px; font-size: 13px;">🍃 MongoDB Ingested Documents (Matched)</h4>
-                            <div id="join-mongo-output" class="code-box-output" style="height: 220px;">
-Matched MongoDB BSON documents will appear here...
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- JOIN Query Explanation Box -->
-                    <div class="panel margin-top" style="background: #080D1A; border: 1px solid #1E293B; border-radius: 8px; padding: 14px;">
-                        <h4 style="color: #FBBF24; margin-bottom: 6px; font-size: 13px;">📐 How Cross-Database Polyglot JOIN Works:</h4>
-                        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
-                            Unlike single-model relational databases that perform heavy multi-table SQL <code>JOIN</code> operations, 
-                            <strong>ChronoShield</strong> separates write-heavy log storage (MongoDB) from relationship path-finding (Neo4j). 
-                            When an analyst requests deep forensic investigation for an asset, the application performs an in-memory 
-                            <strong>Cross-Database Polyglot Hash Join</strong> using the common foreign identifier (<code>host_id</code> or <code>username</code>), 
-                            unifying the graph risk metrics with raw telemetry payloads in sub-millisecond latency.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Live Database Connection Guide -->
-                <div class="panel card-panel margin-top">
-                    <div class="panel-header">
-                        <h3>🔌 Connect / Join Live External Databases</h3>
-                        <span class="hint-text">Configure live MongoDB Atlas & Neo4j AuraDB connections</span>
-                    </div>
-                    <div style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
-                        <p style="margin-bottom: 10px;">
-                            ChronoShield automatically runs with an internal high-performance fallback engine so it works anywhere. 
-                            To join a live external or local database cluster, update your environment variables or <code>config.py</code>:
-                        </p>
-                        <div class="code-box-output" style="height: 120px;">
-# MongoDB Connection (Local or MongoDB Atlas Cloud)
-MONGO_URI="mongodb://localhost:27017/"  # or "mongodb+srv://user:pass@cluster.mongodb.net/"
-MONGO_DB_NAME="cyber_attack_db"
-
-# Neo4j Connection (Local or Neo4j AuraDB Cloud)
-NEO4J_URI="bolt://localhost:7687"      # or "neo4j+s://xxxxxx.databases.neo4j.io"
-NEO4J_USER="neo4j"
-NEO4J_PASSWORD="your_password"
-                        </div>
-                    </div>
-                </div>
             </div>
         </main>
     </div>
